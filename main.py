@@ -13,21 +13,19 @@ class mouse_config(Gtk.Window):
         
 		Gtk.Window.__init__(self, title="Mouse Config")
 		self.set_position(Gtk.WindowPosition.CENTER)
-		self.set_default_size(420, 200)
-
+		self.set_border_width(5)
         
 		global mouseCombo
 		mouseCombo = Gtk.ComboBoxText()
 		mouseCombo.connect("changed", self.mouse_selected)
-		mouseCombo.set_size_request(120, 30)
-		
+		mouseCombo.set_size_request(360, 30)
 		
 		accel_label = Gtk.Label()
 		accel_label.set_markup("<b>Mouse Acceleration:</b>")
 		
 		adjustment = Gtk.Adjustment(value=0,
         							lower=0,
-        							upper=25,
+        							upper=100,
         							step_increment=1,
         							page_increment=5,
         							page_size=0)
@@ -40,7 +38,7 @@ class mouse_config(Gtk.Window):
         
 		adjustment = Gtk.Adjustment(value=0,
         							lower=-20,
-        							upper=25,
+        							upper=100,
         							step_increment=1,
         							page_increment=5,
         							page_size=0)
@@ -51,15 +49,39 @@ class mouse_config(Gtk.Window):
 		self.startup_checkButton.set_active(True)
 		if self.startup_checkButton.get_active():
 			self.run_commands_on_startup()
+			
+		
+		grid = Gtk.Grid()	
+		
+		listBox = Gtk.ListBox()
+		empty_label = Gtk.Label('')
+		
+		row1 = Gtk.ListBoxRow()
+		hbox1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=50) # TODO set spacing to dynamically change according to window size
+		hbox1.pack_start(accel_label, True, True, 0)
+		hbox1.pack_start(self.accel_spin, False, True, 0)
+		row1.add(hbox1)
+		listBox.add(row1)
+		
+		row2 = Gtk.ListBoxRow()
+		hbox2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=50) # TODO set spacing to dynamically change according to window size
+		hbox2.pack_start(decel_label, True, True, 0)
+		hbox2.pack_start(self.decel_spin, False, True, 0)
+		row2.add(hbox2)
+		listBox.add(row2)	
+		
+		row3 = Gtk.ListBoxRow()
+		hbox3 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=50) # TODO set spacing to dynamically change according to window size
+		hbox3.pack_end(self.startup_checkButton, False, True, 0)
+		row3.add(hbox3)
+		listBox.add(row3)
+		
+
+		grid.add(mouseCombo)
+		grid.attach(empty_label, 0, 2, 1, 1)
+		grid.attach(listBox, 0, 4, 1, 2)
+		self.add(grid)
 	
-		fix = Gtk.Fixed()	
-		fix.put(mouseCombo, 5, 8)
-		fix.put(accel_label,10 ,45)
-		fix.put(self.accel_spin, 130, 70)
-		fix.put(decel_label, 10, 110)
-		fix.put(self.decel_spin, 130, 135)
-		fix.put(self.startup_checkButton, 280, 180)
-		self.add(fix)
 		
 		#####################################################################################################################
 		#####################################################################################################################
@@ -97,6 +119,7 @@ class mouse_config(Gtk.Window):
 			counter+=1
 		
 		# search for pointer, trim whitespace and get id of device in 'line'
+		self.p_names = []  # to hold pointer names
 		with open('.pointers', 'r') as f:
 			for line in f:
 				if 'slave  pointer' in line:
@@ -108,13 +131,19 @@ class mouse_config(Gtk.Window):
 							if self.confirm_id(ctr, line):
 								print('\tPointer id -- {}\n\n\n'.format(self.slave_id))
 							self.trim_whitespace(ctr, line)
-							print(self.p_name)
 						ctr+=1
+						
+		########################################################
+		for device in self.p_names:
+			mouseCombo.append_text(device)
+		########################################################
 				
         
-	def mouse_selected(self):
+	def mouse_selected(self, mouseCombo):
 		self.mouse = mouseCombo.get_active_text()
+		print(self.mouse)
         
+
 	def run_commands_on_startup(self):
 		home = os.environ["HOME"]
 		os.chdir(home)
@@ -122,12 +151,14 @@ class mouse_config(Gtk.Window):
 			os.mkdir(".mouse_config")              
 			os.chdir(".mouse_config")
         
+        
 	def accel_spin_changed(self, accel_spin):
 		accel_value = self.accel_spin.get_value()
 		acccel_value = str(accel_value)
 		accel_value = int(accel_value)
 		print(accel_value)
 		os.system("xset m {}".format(accel_value))
+		
 		
 	def trim_whitespace(self, index, cmd):
 		to_trim = cmd[index:] 
@@ -151,10 +182,11 @@ class mouse_config(Gtk.Window):
 							x = len(self.p_name) - ctr
 							self.p_name = self.p_name[:-x]
 					ctr1+=1 
+					
 			ctr+=1
+		self.p_names.append(self.p_name)
+				  
 				
-		
-		
 	def confirm_id(self, index, cmd):
 		self.slave_id = []  # pointer id
 		self.cmd = cmd[index:]
