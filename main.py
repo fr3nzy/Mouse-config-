@@ -88,6 +88,7 @@ class mouse_config(Gtk.Window):
 		
 		xinput_output = subprocess.run(['xinput','--list'], stdout=subprocess.PIPE).stdout.decode('utf-8')	
 		cwd = subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout.decode('utf-8')
+		# TODO: change pwd to home directory 
 		
 		# create file '.pointers'
 		os.chdir(cwd[:-1])
@@ -120,16 +121,17 @@ class mouse_config(Gtk.Window):
 		
 		# search for pointer, trim whitespace and get id of device in 'line'
 		self.p_names = []  # to hold pointer names
+		self.p_ids = []  # to hold pointer ids
 		with open('.pointers', 'r') as f:
 			for line in f:
 				if 'slave  pointer' in line:
-					print(line)
 					ctr=0
 					for item in line:  
 						# find id
+
 						if item in '=':  # '=' is followed by the id
 							if self.confirm_id(ctr, line):
-								print('\tPointer id -- {}\n\n\n'.format(self.slave_id))
+								print('\tPointer id -- {}\n\n\n'.format(self.p_ids))
 							self.trim_whitespace(ctr, line)
 						ctr+=1
 						
@@ -140,8 +142,41 @@ class mouse_config(Gtk.Window):
 				
         
 	def mouse_selected(self, mouseCombo):
-		self.mouse = mouseCombo.get_active_text()
-		print(self.mouse)
+		list_prop = subprocess.run(['xinput', 'list-props', str(self.p_ids)], stdout=subprocess.PIPE).stdout.decode('utf-8')
+
+		with open('.list_props', 'w') as f:
+			f.write(list_prop)
+		
+		# search for property id in .list_props which contains the output of 'xinput list-props device_id'
+		with open('.list_props', 'r') as f:
+			for line in f:
+				if 'Accel Constant Deceleration' in line:
+					print('ay')
+					ctr=0
+					print(line)
+					for i in line:
+						if '(' in i:
+							ctr1=0
+							for a in line:
+								if ctr1 == (ctr+1):
+									if a.isdigit():
+										self.property = int(a)
+										ctr2=0
+										for b in line:
+											if ctr2 == (ctr+2):
+												if b.isdigit():
+													self.property = (self.property * 10) + int(b)
+													ctr3=0
+													for c in line:
+														if ctr3 == (ctr+3):
+															if c.isdigit():
+																self.property = (self.property * 10) + int(c)
+																self.prop_id = self.property
+																print('Property id: {}'.format(self.prop_id))
+														ctr3+=1
+											ctr2+=1
+								ctr1+=1
+						ctr+=1
         
 
 	def run_commands_on_startup(self):
@@ -188,23 +223,27 @@ class mouse_config(Gtk.Window):
 				  
 				
 	def confirm_id(self, index, cmd):
-		self.slave_id = []  # pointer id
 		self.cmd = cmd[index:]
 		for a in self.cmd:
 			if (a in '='):
 				self.cmd = self.cmd[1:]
 				for b in self.cmd:
-					if (b.isdigit()):
-						self.slave_id.append(b)
+					if b.isdigit():
+						self.p_id = b
+						self.p_id = int(self.p_id)
 						self.cmd = self.cmd[1:]
 						for c in self.cmd:
-							if (c.isdigit()):
-								self.slave_id.append(c)
+							if c.isdigit():
+								self.p_id = (self.p_id * 10) + int(c)
+								self.p_ids.append(self.p_id)
 								return True
 							else:
+								self.p_ids.append(self.p_id)
 								return True					
 			else:
-				self.cmd = self.cmd[1:]				
+				self.cmd = self.cmd[1:]		
+		
+			
 										
 				
         
