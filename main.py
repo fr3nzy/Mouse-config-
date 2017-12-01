@@ -1,11 +1,14 @@
 #!python3
 
+# requirements - cron
+
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk
 
 import subprocess
 import os
+import time
 
 
 class mouse_config(Gtk.Window):
@@ -21,7 +24,7 @@ class mouse_config(Gtk.Window):
 		mouseCombo.set_size_request(360, 30)
 		
 		accel_label = Gtk.Label()
-		accel_label.set_markup("<b>Mouse Acceleration:</b>")
+		accel_label.set_markup("<b>Acceleration</b>")
 		
 		adjustment = Gtk.Adjustment(value=0,
         							lower=0,
@@ -34,16 +37,17 @@ class mouse_config(Gtk.Window):
 		self.accel_spin.connect("value-changed", self.accel_spin_changed)
 		
 		decel_label = Gtk.Label()
-		decel_label.set_markup("<b>Mouse Deceleration:</b>")
+		decel_label.set_markup("<b>Deceleration</b>")
         
 		adjustment = Gtk.Adjustment(value=0,
-        							lower=-20,
+        							lower=0,
         							upper=100,
         							step_increment=1,
         							page_increment=5,
         							page_size=0)
 		self.decel_spin = Gtk.SpinButton()
 		self.decel_spin.set_adjustment(adjustment)
+		self.decel_spin.connect('value-changed', self.decel_spin_changed)
 		
 		self.startup_checkButton = Gtk.CheckButton(label="Run on Startup")
 		self.startup_checkButton.set_active(True)
@@ -57,21 +61,21 @@ class mouse_config(Gtk.Window):
 		empty_label = Gtk.Label('')
 		
 		row1 = Gtk.ListBoxRow()
-		hbox1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=50) # TODO set spacing to dynamically change according to window size
+		hbox1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=140) # TODO set spacing to dynamically change according to window size
 		hbox1.pack_start(accel_label, True, True, 0)
 		hbox1.pack_start(self.accel_spin, False, True, 0)
 		row1.add(hbox1)
 		listBox.add(row1)
 		
 		row2 = Gtk.ListBoxRow()
-		hbox2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=50) # TODO set spacing to dynamically change according to window size
+		hbox2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=140) # TODO set spacing to dynamically change according to window size
 		hbox2.pack_start(decel_label, True, True, 0)
 		hbox2.pack_start(self.decel_spin, False, True, 0)
 		row2.add(hbox2)
 		listBox.add(row2)	
 		
 		row3 = Gtk.ListBoxRow()
-		hbox3 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=50) # TODO set spacing to dynamically change according to window size
+		hbox3 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL) # TODO set spacing to dynamically change according to window size
 		hbox3.pack_end(self.startup_checkButton, False, True, 0)
 		row3.add(hbox3)
 		listBox.add(row3)
@@ -122,17 +126,23 @@ class mouse_config(Gtk.Window):
 		# search for pointer, trim whitespace and get id of device in 'line'
 		self.p_names = []  # to hold pointer names
 		self.p_ids = []  # to hold pointer ids
+		self.name_id = {}  # dictionary to hold 'name':id
+		ctr1=0
 		with open('.pointers', 'r') as f:
 			for line in f:
 				if 'slave  pointer' in line:
 					ctr=0
 					for item in line:  
 						# find id
-
 						if item in '=':  # '=' is followed by the id
 							if self.confirm_id(ctr, line):
 								print('\tPointer id -- {}\n\n\n'.format(self.p_ids))
 							self.trim_whitespace(ctr, line)
+							# add name and id to dict 'self.name_id'
+							self.name_id[self.p_names[ctr1]] = self.p_ids[ctr1]
+							print(ctr1)
+							print(self.name_id)
+							ctr1+=1
 						ctr+=1
 						
 		########################################################
@@ -142,16 +152,20 @@ class mouse_config(Gtk.Window):
 				
         
 	def mouse_selected(self, mouseCombo):
-		list_prop = subprocess.run(['xinput', 'list-props', str(self.p_ids)], stdout=subprocess.PIPE).stdout.decode('utf-8')
+		self.chosen = mouseCombo.get_active_text()
+		for k,v in self.name_id.items()	:
+			if self.chosen == k:
+					self.id = v
+		list_prop = subprocess.run(['xinput', 'list-props', str(self.id)], stdout=subprocess.PIPE).stdout.decode('utf-8')
 
 		with open('.list_props', 'w') as f:
 			f.write(list_prop)
 		
 		# search for property id in .list_props which contains the output of 'xinput list-props device_id'
+		ctr4=0
 		with open('.list_props', 'r') as f:
 			for line in f:
 				if 'Accel Constant Deceleration' in line:
-					print('ay')
 					ctr=0
 					print(line)
 					for i in line:
@@ -173,10 +187,19 @@ class mouse_config(Gtk.Window):
 																self.property = (self.property * 10) + int(c)
 																self.prop_id = self.property
 																print('Property id: {}'.format(self.prop_id))
+															
 														ctr3+=1
 											ctr2+=1
 								ctr1+=1
 						ctr+=1
+						ctr4+=1
+			if (ctr4 == 0):
+				time.sleep(0.5)
+				dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.INFO,
+					Gtk.ButtonsType.OK, 'Deceleration mode not available!')
+				dialog.format_secondary_text('Constant deceleration is not available for this device')
+				dialog.run()
+				dialog.destroy()
         
 
 	def run_commands_on_startup(self):
@@ -189,10 +212,22 @@ class mouse_config(Gtk.Window):
         
 	def accel_spin_changed(self, accel_spin):
 		accel_value = self.accel_spin.get_value()
-		acccel_value = str(accel_value)
 		accel_value = int(accel_value)
 		print(accel_value)
-		os.system("xset m {}".format(accel_value))
+		os.system('xset m {}'.format(accel_value))
+		
+		
+	def decel_spin_changed(self, decel_spin):
+		decel_value = self.decel_spin.get_value()
+		if mouseCombo.get_active_text():
+			pass
+			os.system('xinput set-prop {} {} {}'.format(self.id, self.prop_id, decel_value))
+		else:
+			dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
+				Gtk.ButtonsType.OK, 'No device selected!')
+			dialog.format_secondary_text('Select a device to change deceleration')
+			dialog.run()
+			dialog.destroy()
 		
 		
 	def trim_whitespace(self, index, cmd):
@@ -241,11 +276,7 @@ class mouse_config(Gtk.Window):
 								self.p_ids.append(self.p_id)
 								return True					
 			else:
-				self.cmd = self.cmd[1:]		
-		
-			
-										
-				
+				self.cmd = self.cmd[1:]			
         
         
 window = mouse_config()
