@@ -67,7 +67,7 @@ class mouse_config(Gtk.Window):
 		xinput_output = subprocess.run(['xinput','--list'], stdout=subprocess.PIPE).stdout.decode('utf-8')	
 		cwd = subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout.decode('utf-8')
 		
-
+		# create file '.pointers'
 		os.chdir(cwd[:-1])
 		if os.path.isfile('.pointers'):
 			print('overwriting..')
@@ -78,40 +78,38 @@ class mouse_config(Gtk.Window):
 			
 		# counters
 		counter=0
-		position=0
+		position=0	# changes after first loop to counter - 
+					# for each successful 'if' clause position is value of all characters to remove 
+					# from start of variable 'x'		
 		ctr=0	
 		for i in xinput_output:	
-			if i in ']':
+			if i in ']':  # ']' is close to end of line
 				x = len(xinput_output) - (counter)
-				x = xinput_output[:-x]  # remove from end to after ']'
-				if ctr >= 1:
-					x = x[position:]
-					x = x[7:]
-				else:
-					x = x[7:]
-				variable = '{}'.format(x)
+				x = xinput_output[:-x]  # remove from end to after ']'  
+				x = x[position:]  # slice first item in string
+				x = x[7:]  # removes '⎜   ↳' from the start
 				
 				with open('{}/.pointers'.format(cwd[:-1]), 'a') as f:
-					f.write('{}\n'.format(variable))
+					f.write('{}\n'.format(x))
 				
-				position = counter
+				position = counter 
 				ctr+=1
 			counter+=1
 		
+		# search for pointer, trim whitespace and get id of device in 'line'
 		with open('.pointers', 'r') as f:
 			for line in f:
 				if 'slave  pointer' in line:
 					print(line)
 					ctr=0
-					for item in line:
+					for item in line:  
 						# find id
-						if item in '=':
+						if item in '=':  # '=' is followed by the id
 							if self.confirm_id(ctr, line):
 								print('\tPointer id -- {}\n\n\n'.format(self.slave_id))
+							self.trim_whitespace(ctr, line)
+							print(self.p_name)
 						ctr+=1
-					
-		#	if self.confirm_slave('s', counter, xinput_output):
-		#			print('SUCCESS --------------------------------------  !!!!!')
 				
         
 	def mouse_selected(self):
@@ -132,30 +130,33 @@ class mouse_config(Gtk.Window):
 		os.system("xset m {}".format(accel_value))
 		
 	def trim_whitespace(self, index, cmd):
+		to_trim = cmd[index:] 
+		len_trim = len(to_trim)
+		len_trim = len_trim + 2 # remove 'id'
 		
-		"""	
-		pointers = []  # empty list 
+		self.p_name = cmd[:-len_trim]
 		
-		isSpace = 0  # counter for whitespace breaks
-		ctr = 0 # counter for iter
-		char_ctr = 0  # counter for number of chars in each string
-		for i in pointers:
-			print(i)
-			for item in i:
-				char_ctr += 1
-				if ' ' in i:
-					isSpace += 1
-					if isSpace == 5:
-						x = pointers[ctr]
-						x = x[char_ctr:]
-			ctr += 1
-		print('x')
-		print(x)
-					
-		print('This is: {}'.format(ctr))"""
+		# remove whitespace at end of len_trim
+		# discard whitespace between words so whitespace must be more than 1 item
+		ctr=0
+		ctr1=0
+		for i in self.p_name:
+			if ' ' in i:
+				for a in self.p_name:
+					# if iter in first loop is one less than current iter 
+					if ctr == (ctr1-1):  	
+						# if second item is also whitespace
+						if ' ' in a:
+							# trim self.p_name of all items after first iter
+							x = len(self.p_name) - ctr
+							self.p_name = self.p_name[:-x]
+					ctr1+=1 
+			ctr+=1
+				
+		
 		
 	def confirm_id(self, index, cmd):
-		self.slave_id = []
+		self.slave_id = []  # pointer id
 		self.cmd = cmd[index:]
 		for a in self.cmd:
 			if (a in '='):
@@ -169,71 +170,11 @@ class mouse_config(Gtk.Window):
 								self.slave_id.append(c)
 								return True
 							else:
-								return True
-					
+								return True					
 			else:
-				self.cmd = self.cmd[1:]
-			
-		
-		
-#	def confirm_slave(self, char, index, cmd):
-#		# if char = 's' then trim all items before 's'. step by step character search for 'slave'
-#		cmd = cmd[index:]
-#		ctr_l=0
-#		for i in cmd:
-#			if (ctr_l==0) and (i in 'l'):
-#				cmd = cmd[1:]
-#				ctr_a=0
-#				for x in cmd:
-#					if (ctr_a==0) and (x in 'a'):
-#						cmd = cmd[1:]
-#						ctr_v=0
-#						for y in cmd:
-#							if (ctr_v==0) and (y in 'v'):
-#								cmd = cmd[1:]
-#								ctr_e=0
-#								for z in cmd:
-#									if (ctr_e==0) and (z in 'e'):
-#										cmd = cmd[1:]
-#										ctr_space=0
-#										for a in cmd:
-#											if (ctr_space==0) and (a in ' '):
-#												cmd = cmd[1:]
-#												ctr_p=0
-#												for b in cmd:
-#													if (ctr_p==0) and (b == ' '):
-#														cmd = cmd[1:]
-#														ctr_p1=0
-#														for b in cmd:
-#															if (ctr_p1==0) and (b == 'p'):
-#																cmd = cmd[1:]
-#																ctr_o=0
-#																for c in cmd:
-#																	if (ctr_o==0) and (c in 'o'):
-#																		cmd = cmd[1:]
-#																		ctr_i=0
-#																		for d in cmd:
-#																			if (ctr_i==0) and (d in 'i'):
-#																				cmd = cmd[1:]
-#																				ctr_n=0
-#																				for e in cmd:
-#																					if (ctr_n==0) and (e in 'n'):
-#																						return True
-#																					ctr_n+=1
-#																			ctr_i+=1
-#																	ctr_o+=1
-#															ctr_p1+=1
-#														ctr_p+=1
-#											ctr_space+=1
-#									ctr_e+=1
-#							ctr_v+=1
-#					ctr_a+=1
-#			ctr_l+=1
-			
-				
+				self.cmd = self.cmd[1:]				
 										
 				
-			
         
         
 window = mouse_config()
