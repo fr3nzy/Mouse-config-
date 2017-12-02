@@ -4,7 +4,7 @@
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, Gio
 
 import subprocess
 import os
@@ -16,7 +16,18 @@ class mouse_config(Gtk.Window):
         
 		Gtk.Window.__init__(self, title="Mouse Config")
 		self.set_position(Gtk.WindowPosition.CENTER)
-		self.set_border_width(5)
+		self.set_border_width(10)
+		
+		headerBar = Gtk.HeaderBar()
+		headerBar.set_show_close_button(True)
+		headerBar.props.title = 'Velocity'
+		self.set_titlebar(headerBar)
+		
+		about_button = Gtk.Button()
+		icon = Gio.ThemedIcon(name='help-about-symbolic')
+		image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
+		about_button.add(image)
+		headerBar.pack_start(about_button)
         
 		global mouseCombo
 		mouseCombo = Gtk.ComboBoxText()
@@ -34,6 +45,8 @@ class mouse_config(Gtk.Window):
         							page_size=0)
 		self.accel_spin = Gtk.SpinButton()
 		self.accel_spin.set_adjustment(adjustment)
+		self.accel_value = self.accel_spin.get_value()
+		self.accel_value = int(self.accel_value)
 		self.accel_spin.connect("value-changed", self.accel_spin_changed)
 		
 		decel_label = Gtk.Label()
@@ -47,13 +60,11 @@ class mouse_config(Gtk.Window):
         							page_size=0)
 		self.decel_spin = Gtk.SpinButton()
 		self.decel_spin.set_adjustment(adjustment)
+		self.decel_value = self.decel_spin.get_value()
 		self.decel_spin.connect('value-changed', self.decel_spin_changed)
 		
 		self.startup_checkButton = Gtk.CheckButton(label="Run on Startup")
-		self.startup_checkButton.set_active(True)
-		if self.startup_checkButton.get_active():
-			self.run_commands_on_startup()
-			
+		self.startup_checkButton.connect('toggled', self.startup_check_changed)
 		
 		grid = Gtk.Grid()	
 		
@@ -61,21 +72,21 @@ class mouse_config(Gtk.Window):
 		empty_label = Gtk.Label('')
 		
 		row1 = Gtk.ListBoxRow()
-		hbox1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=140) # TODO set spacing to dynamically change according to window size
+		hbox1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=140)
 		hbox1.pack_start(accel_label, True, True, 0)
 		hbox1.pack_start(self.accel_spin, False, True, 0)
 		row1.add(hbox1)
 		listBox.add(row1)
 		
 		row2 = Gtk.ListBoxRow()
-		hbox2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=140) # TODO set spacing to dynamically change according to window size
+		hbox2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=140)
 		hbox2.pack_start(decel_label, True, True, 0)
 		hbox2.pack_start(self.decel_spin, False, True, 0)
 		row2.add(hbox2)
 		listBox.add(row2)	
 		
 		row3 = Gtk.ListBoxRow()
-		hbox3 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL) # TODO set spacing to dynamically change according to window size
+		hbox3 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
 		hbox3.pack_end(self.startup_checkButton, False, True, 0)
 		row3.add(hbox3)
 		listBox.add(row3)
@@ -91,11 +102,15 @@ class mouse_config(Gtk.Window):
 		#####################################################################################################################
 		
 		xinput_output = subprocess.run(['xinput','--list'], stdout=subprocess.PIPE).stdout.decode('utf-8')	
-		cwd = subprocess.run(['pwd'], stdout=subprocess.PIPE).stdout.decode('utf-8')
-		# TODO: change pwd to home directory 
+		self.home = os.environ["HOME"] + '/'
+		print(self.home)
+		os.chdir(self.home)
+		if os.path.isdir(".mouse_config") == False:
+			os.mkdir(".mouse_config")              
+			os.chdir(".mouse_config")
+		os.chdir(self.home+'.mouse_config')
 		
 		# create file '.pointers'
-		os.chdir(cwd[:-1])
 		if os.path.isfile('.pointers'):
 			print('overwriting..')
 			os.system('rm -rf .pointers')
@@ -116,7 +131,7 @@ class mouse_config(Gtk.Window):
 				x = x[position:]  # slice first item in string
 				x = x[7:]  # removes '⎜   ↳' from the start
 				
-				with open('{}/.pointers'.format(cwd[:-1]), 'a') as f:
+				with open('.pointers', 'a') as f:
 					f.write('{}\n'.format(x))
 				
 				position = counter 
@@ -152,6 +167,7 @@ class mouse_config(Gtk.Window):
 				
         
 	def mouse_selected(self, mouseCombo):
+		# i really don't know why this is working
 		self.chosen = mouseCombo.get_active_text()
 		for k,v in self.name_id.items()	:
 			if self.chosen == k:
@@ -201,27 +217,18 @@ class mouse_config(Gtk.Window):
 				dialog.run()
 				dialog.destroy()
         
-
-	def run_commands_on_startup(self):
-		home = os.environ["HOME"]
-		os.chdir(home)
-		if os.path.isdir(".mouse_config") == False:
-			os.mkdir(".mouse_config")              
-			os.chdir(".mouse_config")
-        
         
 	def accel_spin_changed(self, accel_spin):
-		accel_value = self.accel_spin.get_value()
-		accel_value = int(accel_value)
-		print(accel_value)
-		os.system('xset m {}'.format(accel_value))
+		self.accel_value = self.accel_spin.get_value()
+		self.accel_value = int(self.accel_value)
+		print(self.accel_value)
+		os.system('xset m {}'.format(self.accel_value))
 		
 		
 	def decel_spin_changed(self, decel_spin):
-		decel_value = self.decel_spin.get_value()
+		self.decel_value = self.decel_spin.get_value()
 		if mouseCombo.get_active_text():
-			pass
-			os.system('xinput set-prop {} {} {}'.format(self.id, self.prop_id, decel_value))
+			os.system('xinput set-prop {} {} {}'.format(self.id, self.prop_id, self.decel_value))
 		else:
 			dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
 				Gtk.ButtonsType.OK, 'No device selected!')
@@ -278,6 +285,18 @@ class mouse_config(Gtk.Window):
 			else:
 				self.cmd = self.cmd[1:]			
         
+	def startup_check_changed(self, startup_checkButton):
+		if	startup_checkButton.get_active() == True:
+			with open('startup.sh', 'w') as f:
+				f.write('xset m {}\n'.format(self.accel_value))
+				f.write('xinput set-prop {} {} {}'.format(self.id, self.prop_id, self.decel_value))
+			os.system('chmod +x startup.sh')
+			os.system('#crontab -e && @reboot {}startup.sh'.format(self.home))
+			print('yay')
+		else:
+			print('damn')
+			os.system('rm startup.sh')
+		
         
 window = mouse_config()
 window.show_all()
