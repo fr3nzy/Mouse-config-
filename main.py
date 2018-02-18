@@ -1,7 +1,5 @@
 #!python3
 
-# requirements - cron
-
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, Gio
@@ -10,7 +8,18 @@ import subprocess
 import os
 import time
 
+home = os.environ["HOME"] + '/'
+os.chdir(home)
+if os.path.isdir(".mouse_config") == False:
+	os.mkdir(".mouse_config")              
+	os.chdir(".mouse_config")
+else:
+	os.chdir(home+'.mouse_config')
 
+license = subprocess.run(['python', 'license.py'], stdout=subprocess.PIPE).stdout.decode('utf-8')
+
+				
+		
 class mouse_config(Gtk.Window):
 	def __init__(self):
         
@@ -27,6 +36,7 @@ class mouse_config(Gtk.Window):
 		icon = Gio.ThemedIcon(name='help-about-symbolic')
 		image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
 		about_button.add(image)
+		about_button.connect('clicked', self.about_btn_activate)
 		headerBar.pack_start(about_button)
         
 		global mouseCombo
@@ -63,13 +73,13 @@ class mouse_config(Gtk.Window):
 		self.decel_value = self.decel_spin.get_value()
 		self.decel_spin.connect('value-changed', self.decel_spin_changed)
 		
-		self.startup_checkButton = Gtk.CheckButton(label="Run on Startup")
-		self.startup_checkButton.connect('toggled', self.startup_check_changed)
+		self.startup_Button = Gtk.Button(label="Run on Startup?")
+		self.startup_Button.connect('clicked', self.startup_clicked)
 		
 		grid = Gtk.Grid()	
 		
 		listBox = Gtk.ListBox()
-		empty_label = Gtk.Label('')
+		empty_label = Gtk.Label()
 		
 		row1 = Gtk.ListBoxRow()
 		hbox1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=140)
@@ -87,9 +97,16 @@ class mouse_config(Gtk.Window):
 		
 		row3 = Gtk.ListBoxRow()
 		hbox3 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-		hbox3.pack_end(self.startup_checkButton, False, True, 0)
+		empty_label1 = Gtk.Label()
+		hbox3.pack_start(empty_label1, True, True, 0)
 		row3.add(hbox3)
 		listBox.add(row3)
+		
+		row4 = Gtk.ListBoxRow()
+		hbox4 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+		hbox4.pack_start(self.startup_Button, True, True, 0)
+		row4.add(hbox4)
+		listBox.add(row4)
 		
 
 		grid.add(mouseCombo)
@@ -102,13 +119,6 @@ class mouse_config(Gtk.Window):
 		#####################################################################################################################
 		
 		xinput_output = subprocess.run(['xinput','--list'], stdout=subprocess.PIPE).stdout.decode('utf-8')	
-		self.home = os.environ["HOME"] + '/'
-		print(self.home)
-		os.chdir(self.home)
-		if os.path.isdir(".mouse_config") == False:
-			os.mkdir(".mouse_config")              
-			os.chdir(".mouse_config")
-		os.chdir(self.home+'.mouse_config')
 		
 		# create file '.pointers'
 		if os.path.isfile('.pointers'):
@@ -285,18 +295,24 @@ class mouse_config(Gtk.Window):
 			else:
 				self.cmd = self.cmd[1:]			
         
-	def startup_check_changed(self, startup_checkButton):
-		if	startup_checkButton.get_active() == True:
-			with open('startup.sh', 'w') as f:
-				f.write('xset m {}\n'.format(self.accel_value))
-				f.write('xinput set-prop {} {} {}'.format(self.id, self.prop_id, self.decel_value))
-			os.system('chmod +x startup.sh')
-			os.system('#crontab -e && @reboot {}startup.sh'.format(self.home))
-			print('yay')
-		else:
-			print('damn')
-			os.system('rm startup.sh')
+	def startup_clicked	(self, startup_Button):
+			dialog = Gtk.Dialog()
+			accel = ('xset m {}\n'.format(self.accel_value))
+			decel = ('xinput set-prop {} {} {}'.format(self.id, self.prop_id, self.decel_value))
+			
+			
+	def about_btn_activate(self, about_button):
+		dialog = Gtk.AboutDialog()
+		dialog.set_program_name('Velocity')
+		dialog.set_version('0.1.0')
+		dialog.set_website("Youneedtocreateone.com")
+		dialog.set_authors("Luther")
+		dialog.set_license(license)
+		dialog.set_logo_icon_name('mouse-512.png')
+		dialog.set_default_size(300, 150)
+		dialog.show()
 		
+			
         
 window = mouse_config()
 window.show_all()
